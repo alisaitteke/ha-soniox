@@ -26,6 +26,7 @@ Type: HACS custom integration (`custom_components/soniox`). Not an add-on. Not W
 | `custom_components/soniox/const.py` | Regions, default models, option keys |
 | `custom_components/soniox/stt.py` / `tts.py` | Placeholders; platforms not forwarded yet |
 | `custom_components/soniox/quality_scale.yaml` | Bronze/Silver/Gold tracking |
+| `custom_components/soniox/brand/` | HA 2026.3+ icon/logo (official Soniox mark) |
 | `scripts/develop` | Local `hass --debug` with `PYTHONPATH` |
 | `scripts/check_version.py` | Lockstep check: manifest == pyproject; on release, tag (strip `v`) must match |
 | `config/configuration.yaml` | Debug logger for `custom_components.soniox` |

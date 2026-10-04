@@ -7,7 +7,8 @@ rules:
     status: exempt
     comment: Request/response cloud STT/TTS; there is no polling interval.
   brands:
-    status: todo
+    status: done
+    comment: Local brand images in custom_components/soniox/brand/ (HA 2026.3+).
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
