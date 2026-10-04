@@ -1,0 +1,14 @@
+{
+  "entity": {
+    "stt": {
+      "soniox_stt": {
+        "default": "mdi:waveform"
+      }
+    },
+    "tts": {
+      "soniox_tts": {
+        "default": "mdi:speaker-message"
+      }
+    }
+  }
+}

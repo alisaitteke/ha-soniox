@@ -1,0 +1,120 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: No service actions are registered yet.
+  appropriate-polling:
+    status: exempt
+    comment: Request/response cloud STT/TTS; there is no polling interval.
+  brands:
+    status: todo
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: No service actions are registered yet.
+  docs-conditions:
+    status: exempt
+    comment: This integration does not provide conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: This integration does not provide triggers.
+  entity-event-setup:
+    status: exempt
+    comment: Platforms are not forwarded yet; no entity event subscriptions.
+  entity-unique-id:
+    status: todo
+    comment: STT/TTS entities are added in the implementation phase.
+  has-entity-name:
+    status: todo
+    comment: STT/TTS entities are added in the implementation phase.
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: No service actions are registered yet.
+  config-entry-unloading: done
+  docs-configuration-parameters:
+    status: todo
+  docs-installation-parameters:
+    status: todo
+  entity-unavailable:
+    status: exempt
+    comment: No entities are created in the infrastructure phase.
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+  parallel-updates:
+    status: todo
+    comment: Set when STT/TTS platforms are forwarded.
+  reauthentication-flow: done
+  test-coverage:
+    status: todo
+
+  # Gold
+  devices:
+    status: todo
+    comment: DeviceEntryType.SERVICE is added with STT/TTS entities.
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: Cloud API service; there is no discoverable device.
+  discovery-update-info:
+    status: exempt
+    comment: Cloud API service; there is no network discovery info.
+  docs-data-update:
+    status: exempt
+    comment: No polled device state; STT/TTS are on-demand.
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: todo
+  docs-supported-devices:
+    status: exempt
+    comment: This integration does not support physical devices.
+  docs-supported-functions:
+    status: todo
+  docs-troubleshooting:
+    status: todo
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: exempt
+    comment: Cloud API service; there are no dynamic devices.
+  entity-category:
+    status: todo
+  entity-device-class:
+    status: exempt
+    comment: There is no device class for STT/TTS entities.
+  entity-disabled-by-default:
+    status: todo
+  entity-translations:
+    status: todo
+  exception-translations:
+    status: todo
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues:
+    status: todo
+  stale-devices:
+    status: exempt
+    comment: Cloud API service; there are no physical devices to expire.
+
+  # Platinum
+  async-dependency: done
+  inject-websession:
+    status: exempt
+    comment: >
+      The official soniox SDK constructs its own httpx.AsyncClient and does
+      not accept an injected Home Assistant websession.
+  strict-typing:
+    status: todo

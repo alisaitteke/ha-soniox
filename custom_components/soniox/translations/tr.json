@@ -1,0 +1,57 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Soniox zaten yapılandırılmış.",
+      "reauth_successful": "Yeniden kimlik doğrulama başarılı",
+      "reconfigure_successful": "Yeniden yapılandırma başarılı",
+      "wrong_account": "API anahtarı mevcut Soniox hesabıyla eşleşmiyor."
+    },
+    "error": {
+      "cannot_connect": "Bağlantı kurulamadı",
+      "invalid_auth": "Kimlik doğrulama geçersiz",
+      "unknown": "Beklenmeyen hata"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "api_key": "API anahtarı",
+          "region": "Bölge"
+        },
+        "data_description": {
+          "api_key": "Soniox konsolundan API anahtarı. Seçilen bölge için oluşturulmuş bir anahtar kullanın.",
+          "region": "Soniox projesinin veri yerleşim bölgesi. Ses bu bölgede işlenir."
+        },
+        "description": "Home Assistant'ı Soniox konuşmadan metne ve metinden konuşmaya bağlayın."
+      },
+      "reauth_confirm": {
+        "data": {
+          "api_key": "API anahtarı"
+        },
+        "data_description": {
+          "api_key": "Bu proje için geçerli bir Soniox API anahtarı girin."
+        },
+        "description": "Soniox API anahtarı artık geçerli değil. Devam etmek için yeni bir anahtar girin.",
+        "title": "Soniox kimliğini yeniden doğrula"
+      },
+      "reconfigure": {
+        "data": {
+          "api_key": "API anahtarı",
+          "region": "Bölge"
+        },
+        "data_description": {
+          "api_key": "Soniox konsolundan API anahtarı. Seçilen bölge için oluşturulmuş bir anahtar kullanın.",
+          "region": "Soniox projesinin veri yerleşim bölgesi."
+        },
+        "description": "Soniox API anahtarını veya bölgesini güncelleyin.",
+        "title": "Soniox'u yeniden yapılandır"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Konuşmadan metne ve metinden konuşmaya seçenekleri bir sonraki uygulama aşamasında eklenecek."
+      }
+    }
+  }
+}

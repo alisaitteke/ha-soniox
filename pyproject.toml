@@ -1,0 +1,60 @@
+[project]
+name = "ha-soniox"
+version = "0.1.0"
+description = "Home Assistant custom integration for Soniox STT and TTS"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+src = ["custom_components", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "A",
+    "ASYNC",
+    "B",
+    "C4",
+    "E",
+    "F",
+    "I",
+    "PGH",
+    "PLC",
+    "PLE",
+    "PLW",
+    "SIM",
+    "UP",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"tests/soniox_stubs.py" = ["PLC0415"]
+"tests/conftest.py" = ["E402", "PLC0415"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components"]
+known-third-party = ["homeassistant", "httpx", "soniox", "voluptuous"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["custom_components.soniox"]
+show_error_codes = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "homeassistant.*",
+    "soniox.*",
+    "voluptuous",
+    "httpx",
+]
+ignore_missing_imports = true

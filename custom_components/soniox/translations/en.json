@@ -1,0 +1,57 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Soniox is already configured.",
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful",
+      "wrong_account": "The API key does not match the existing Soniox account."
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "api_key": "API key",
+          "region": "Region"
+        },
+        "data_description": {
+          "api_key": "API key from the Soniox console. Use a key created for the selected region.",
+          "region": "Data-residency region of the Soniox project. Audio is processed in this region."
+        },
+        "description": "Connect Home Assistant to Soniox speech-to-text and text-to-speech."
+      },
+      "reauth_confirm": {
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "Enter a valid Soniox API key for this project."
+        },
+        "description": "The Soniox API key is no longer valid. Enter a new key to continue.",
+        "title": "Reauthenticate Soniox"
+      },
+      "reconfigure": {
+        "data": {
+          "api_key": "API key",
+          "region": "Region"
+        },
+        "data_description": {
+          "api_key": "API key from the Soniox console. Use a key created for the selected region.",
+          "region": "Data-residency region of the Soniox project."
+        },
+        "description": "Update the Soniox API key or region.",
+        "title": "Reconfigure Soniox"
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Speech-to-text and text-to-speech options will be added in the next implementation phase."
+      }
+    }
+  }
+}

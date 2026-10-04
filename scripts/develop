@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+if [[ ! -d "${PWD}/config" ]]; then
+  mkdir -p "${PWD}/config"
+fi
+
+if [[ ! -f "${PWD}/config/configuration.yaml" ]]; then
+  cat > "${PWD}/config/configuration.yaml" <<'EOF'
+default_config:
+homeassistant:
+  debug: true
+logger:
+  default: info
+  logs:
+    custom_components.soniox: debug
+    soniox: debug
+EOF
+fi
+
+hass --config "${PWD}/config" --script ensure_config
+
+# Load this repo's custom_components without a symlink into config/.
+export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}${PWD}/custom_components"
+
+hass --config "${PWD}/config" --debug

@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+
+# Secrets — never commit API keys or local credentials
+.env
+.env.*
+secrets.yaml
+*.pem
+*.key
+
+# Tools
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Home Assistant local instance (keep the committed development config)
+.ha_version
+config/*
+!config/configuration.yaml
