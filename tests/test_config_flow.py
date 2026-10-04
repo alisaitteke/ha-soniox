@@ -1,6 +1,6 @@
 """Tests for the Soniox config flow."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -11,6 +11,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from soniox.errors import SonioxAuthenticationError, SonioxServerError
 
+from custom_components.soniox.catalog import SonioxCatalog
 from custom_components.soniox.client import unique_id_from_api_key
 from custom_components.soniox.const import (
     CONF_REGION,
@@ -18,6 +19,7 @@ from custom_components.soniox.const import (
     DEFAULT_STT_MODEL,
     DEFAULT_TTS_MODEL,
     DOMAIN,
+    SONIOX_CONSOLE_URL,
 )
 
 from .conftest import TEST_API_KEY, TEST_REGION, mock_config_entry_kwargs
@@ -32,6 +34,7 @@ async def test_user_form_creates_entry(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
+    assert result["description_placeholders"]["console_url"] == SONIOX_CONSOLE_URL
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -83,6 +86,7 @@ async def test_user_form_errors(
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_REGION] == "eu"
+    await hass.async_block_till_done()
 
 
 async def test_unique_id_prevents_duplicate(
@@ -134,6 +138,7 @@ async def test_reauth_updates_api_key(
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
+    await hass.async_block_till_done()
 
 
 async def test_reauth_invalid_auth_recovers(
@@ -168,6 +173,7 @@ async def test_reauth_invalid_auth_recovers(
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
+    await hass.async_block_till_done()
 
 
 async def test_reconfigure_updates_region(
@@ -196,10 +202,11 @@ async def test_reconfigure_updates_region(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_REGION] == "eu"
+    await hass.async_block_till_done()
 
 
-async def test_options_flow_keeps_defaults(hass: HomeAssistant) -> None:
-    """The options skeleton stores the existing defaults."""
+async def test_options_flow_starts_at_stt(hass: HomeAssistant) -> None:
+    """Configure opens the STT options step."""
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
@@ -208,12 +215,11 @@ async def test_options_flow_keeps_defaults(hass: HomeAssistant) -> None:
     )
     entry.add_to_hass(hass)
 
-    result = await hass.config_entries.options.async_init(entry.entry_id)
+    with patch(
+        "custom_components.soniox.config_flow.async_load_catalog",
+        return_value=SonioxCatalog(),
+    ):
+        result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "init"
-
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"], user_input={}
-    )
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"]["stt_model"] == DEFAULT_STT_MODEL
+    assert result["step_id"] == "stt"
+    assert result["description_placeholders"]["console_url"] == SONIOX_CONSOLE_URL

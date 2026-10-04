@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 import httpx
-from homeassistant.const import CONF_API_KEY
+from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
@@ -19,6 +19,8 @@ from .models import SonioxConfigEntry, SonioxRuntimeData
 _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+PLATFORMS: list[Platform] = [Platform.STT, Platform.TTS]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -40,13 +42,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: SonioxConfigEntry) -> bo
 
     entry.runtime_data = SonioxRuntimeData(client=client)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: SonioxConfigEntry) -> bool:
     """Unload a config entry."""
-    await entry.runtime_data.client.aclose()
-    return True
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unload_ok:
+        await entry.runtime_data.client.aclose()
+    return unload_ok
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: SonioxConfigEntry) -> None:

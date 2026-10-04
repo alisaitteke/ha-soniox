@@ -18,19 +18,19 @@
           "region": "Bölge"
         },
         "data_description": {
-          "api_key": "Soniox konsolundan API anahtarı. Seçilen bölge için oluşturulmuş bir anahtar kullanın.",
-          "region": "Soniox projesinin veri yerleşim bölgesi. Ses bu bölgede işlenir."
+          "api_key": "Konsolda projeyi açıp API keys bölümüne gidin. Tam anahtar yalnızca bir kez gösterilir.",
+          "region": "Konsoldaki proje bölgesiyle eşleşmeli. Ses bu bölgede işlenir."
         },
-        "description": "Home Assistant'ı Soniox konuşmadan metne ve metinden konuşmaya bağlayın."
+        "description": "API anahtarını [Soniox konsolundan]({console_url}) alın. Bölgeyi projenizle aynı seçin."
       },
       "reauth_confirm": {
         "data": {
           "api_key": "API anahtarı"
         },
         "data_description": {
-          "api_key": "Bu proje için geçerli bir Soniox API anahtarı girin."
+          "api_key": "Konsolda projeyi açıp API keys bölümüne gidin. Tam anahtar yalnızca bir kez gösterilir."
         },
-        "description": "Soniox API anahtarı artık geçerli değil. Devam etmek için yeni bir anahtar girin.",
+        "description": "API anahtarı artık geçerli değil. Yeni bir anahtar için [Soniox konsolunu]({console_url}) kullanın.",
         "title": "Soniox kimliğini yeniden doğrula"
       },
       "reconfigure": {
@@ -39,18 +39,69 @@
           "region": "Bölge"
         },
         "data_description": {
-          "api_key": "Soniox konsolundan API anahtarı. Seçilen bölge için oluşturulmuş bir anahtar kullanın.",
-          "region": "Soniox projesinin veri yerleşim bölgesi."
+          "api_key": "Konsolda projeyi açıp API keys bölümüne gidin. Tam anahtar yalnızca bir kez gösterilir.",
+          "region": "Konsoldaki proje bölgesiyle eşleşmeli. Ses bu bölgede işlenir."
         },
-        "description": "Soniox API anahtarını veya bölgesini güncelleyin.",
+        "description": "API anahtarını [Soniox konsolundan]({console_url}) güncelleyin veya bölgeyi projenizle eşleştirin.",
         "title": "Soniox'u yeniden yapılandır"
       }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "description": "Konuşmadan metne ve metinden konuşmaya seçenekleri bir sonraki uygulama aşamasında eklenecek."
+      "stt": {
+        "title": "Konuşmadan metne",
+        "description": "Bu ayarlar Assist konuşmadan metne için kullanılır. API anahtarı ve bölge **Yeniden yapılandır** altında. Liste boşsa [Soniox konsolunda]({console_url}) **Model listing** iznini açın veya model kimliğini yazın.",
+        "data": {
+          "stt_model": "STT modeli",
+          "language_hints": "Dil ipuçları",
+          "context": "Bağlam",
+          "context_terms": "Özel terimler",
+          "enable_endpoint_detection": "Cümle sonu algılama",
+          "max_endpoint_delay_ms": "Maksimum cümle sonu gecikmesi",
+          "enable_diarization": "Konuşmacı ayırma",
+          "enable_translation": "Tek yönlü çeviri",
+          "translation_target": "Çeviri hedefi"
+        },
+        "data_description": {
+          "stt_model": "Gerçek zamanlı model, genelde stt-rt-v5.",
+          "language_hints": "Assist pipeline diline ek beklenen diller.",
+          "context": "İsim ve alan terimlerine yardımcı arka plan metni.",
+          "context_terms": "Soniox'un tercih etmesi gereken virgülle ayrılmış sözcükler.",
+          "enable_endpoint_detection": "Konuşmacının bitirdiğini algıla.",
+          "max_endpoint_delay_ms": "500–3000 ms. Varsayılan 2000.",
+          "enable_diarization": "Konuşmacı değişince [1], [2], … öneki ekle.",
+          "enable_translation": "Transkripti tek bir hedef dile çevir.",
+          "translation_target": "Yalnızca tek yönlü çeviri açıksa kullanılır."
+        }
+      },
+      "tts": {
+        "title": "Metinden konuşmaya",
+        "description": "Paylaşılan sesler API'den gelir. Klonlanmış sesler için **Cloned voices** izni gerekir. Liste yoksa [Soniox konsolunda]({console_url}) **Model listing** iznini açın veya Adrian gibi bir ses adı yazın.",
+        "data": {
+          "tts_model": "TTS modeli",
+          "tts_voice": "Ses",
+          "tts_speed": "Hız",
+          "reduce_silence": "Sessizliği kısalt"
+        },
+        "data_description": {
+          "tts_model": "Gerçek zamanlı model, genelde tts-rt-v2.",
+          "tts_voice": "Paylaşılan ses adı veya klonlanmış ses kimliği.",
+          "tts_speed": "0.7–1.3. 1.0 normal hızdır.",
+          "reduce_silence": "Model destekliyorsa sözcükler arası duraklamaları kısalt."
+        }
+      }
+    }
+  },
+  "entity": {
+    "stt": {
+      "soniox_stt": {
+        "name": "Konuşmadan metne"
+      }
+    },
+    "tts": {
+      "soniox_tts": {
+        "name": "Metinden konuşmaya"
       }
     }
   }

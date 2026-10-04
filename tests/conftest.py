@@ -1,6 +1,7 @@
 """Shared fixtures for Soniox tests."""
 
 from collections.abc import Generator
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -22,6 +23,16 @@ TEST_API_KEY = "sk_test_soniox_key"
 TEST_REGION = "us"
 
 
+def empty_catalog_client() -> MagicMock:
+    """Return a client whose catalog list methods yield empty results."""
+    client = MagicMock()
+    client.aclose = AsyncMock()
+    client.models.list = AsyncMock(return_value=SimpleNamespace(models=[]))
+    client.tts_models.list = AsyncMock(return_value=SimpleNamespace(models=[]))
+    client.voices.list = AsyncMock(return_value=SimpleNamespace(voices=[]))
+    return client
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
@@ -33,9 +44,7 @@ def auto_enable_custom_integrations(
 @pytest.fixture(autouse=True)
 def mock_soniox_setup_client() -> Generator[MagicMock]:
     """Prevent setup from opening a real Soniox client."""
-    client = MagicMock()
-    client.aclose = AsyncMock()
-    client.models.list = AsyncMock()
+    client = empty_catalog_client()
     with (
         patch("custom_components.soniox.create_soniox_client", return_value=client),
         patch("custom_components.soniox.async_check_client", new_callable=AsyncMock),

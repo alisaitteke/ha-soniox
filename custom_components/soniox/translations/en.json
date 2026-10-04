@@ -18,19 +18,19 @@
           "region": "Region"
         },
         "data_description": {
-          "api_key": "API key from the Soniox console. Use a key created for the selected region.",
-          "region": "Data-residency region of the Soniox project. Audio is processed in this region."
+          "api_key": "In the console, open your project and go to API keys. The full key is shown only once.",
+          "region": "Must match the project's region in the console. Audio is processed in this region."
         },
-        "description": "Connect Home Assistant to Soniox speech-to-text and text-to-speech."
+        "description": "Get an API key from the [Soniox console]({console_url}). Choose the same region as your project."
       },
       "reauth_confirm": {
         "data": {
           "api_key": "API key"
         },
         "data_description": {
-          "api_key": "Enter a valid Soniox API key for this project."
+          "api_key": "In the console, open your project and go to API keys. The full key is shown only once."
         },
-        "description": "The Soniox API key is no longer valid. Enter a new key to continue.",
+        "description": "The API key is no longer valid. Create a new one in the [Soniox console]({console_url}).",
         "title": "Reauthenticate Soniox"
       },
       "reconfigure": {
@@ -39,18 +39,69 @@
           "region": "Region"
         },
         "data_description": {
-          "api_key": "API key from the Soniox console. Use a key created for the selected region.",
-          "region": "Data-residency region of the Soniox project."
+          "api_key": "In the console, open your project and go to API keys. The full key is shown only once.",
+          "region": "Must match the project's region in the console. Audio is processed in this region."
         },
-        "description": "Update the Soniox API key or region.",
+        "description": "Update the API key from the [Soniox console]({console_url}), or change the region to match your project.",
         "title": "Reconfigure Soniox"
       }
     }
   },
   "options": {
     "step": {
-      "init": {
-        "description": "Speech-to-text and text-to-speech options will be added in the next implementation phase."
+      "stt": {
+        "title": "Speech-to-text",
+        "description": "These settings apply to Assist speech-to-text. API key and region are under **Reconfigure**. If a list is empty, enable **Model listing** in the [Soniox console]({console_url}) or type the model id.",
+        "data": {
+          "stt_model": "STT model",
+          "language_hints": "Language hints",
+          "context": "Context",
+          "context_terms": "Custom terms",
+          "enable_endpoint_detection": "Endpoint detection",
+          "max_endpoint_delay_ms": "Max endpoint delay",
+          "enable_diarization": "Speaker diarization",
+          "enable_translation": "One-way translation",
+          "translation_target": "Translation target"
+        },
+        "data_description": {
+          "stt_model": "Realtime model, typically stt-rt-v5.",
+          "language_hints": "Expected languages in addition to the Assist pipeline language.",
+          "context": "Background text that helps names and domain terms.",
+          "context_terms": "Comma-separated words Soniox should prefer.",
+          "enable_endpoint_detection": "Detect when the speaker has finished.",
+          "max_endpoint_delay_ms": "500–3000 ms. Default 2000.",
+          "enable_diarization": "Prefix each speaker change as [1], [2], …",
+          "enable_translation": "Translate the transcript into one target language.",
+          "translation_target": "Used only when one-way translation is enabled."
+        }
+      },
+      "tts": {
+        "title": "Text-to-speech",
+        "description": "Shared voices come from the API. Cloned voices need the **Cloned voices** permission. If the list is missing, enable **Model listing** in the [Soniox console]({console_url}) or type a voice name such as Adrian.",
+        "data": {
+          "tts_model": "TTS model",
+          "tts_voice": "Voice",
+          "tts_speed": "Speed",
+          "reduce_silence": "Reduce silence"
+        },
+        "data_description": {
+          "tts_model": "Realtime model, typically tts-rt-v2.",
+          "tts_voice": "Shared voice name or a cloned voice id.",
+          "tts_speed": "0.7–1.3. 1.0 is normal.",
+          "reduce_silence": "Shorten pauses between words when the model supports it."
+        }
+      }
+    }
+  },
+  "entity": {
+    "stt": {
+      "soniox_stt": {
+        "name": "Speech-to-text"
+      }
+    },
+    "tts": {
+      "soniox_tts": {
+        "name": "Text-to-speech"
       }
     }
   }

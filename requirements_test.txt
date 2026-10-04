@@ -4,3 +4,5 @@ pytest-homeassistant-custom-component>=0.13
 ruff>=0.9
 mypy>=1.13
 soniox==2.10.0
+mutagen==1.47.0
+ha-ffmpeg==3.2.2

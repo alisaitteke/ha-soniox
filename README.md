@@ -2,7 +2,7 @@
 
 Custom Home Assistant integration for [Soniox](https://soniox.com) speech-to-text and text-to-speech. It registers as a cloud service and is meant to be selected as the STT/TTS engine in an Assist pipeline.
 
-This repository currently contains the **infrastructure** (config flow, client wrapper, quality-scale skeleton). Streaming STT/TTS is the next implementation phase and is not forwarded as platforms yet.
+After setup, pick **Soniox** as the Speech-to-text and Text-to-speech engine in **Settings → Voice assistants**.
 
 This is a **community custom integration**. It is **not** an official Home Assistant add-on, **not** an official Soniox product, and is **not affiliated with, endorsed by, or maintained by Soniox**. The GitHub repository is **public** ([alisaitteke/ha-soniox](https://github.com/alisaitteke/ha-soniox)); HACS only tracks public repositories.
 
@@ -19,7 +19,7 @@ This is a **community custom integration**. It is **not** an official Home Assis
 4. Go to **Settings → Devices & services → Add integration → Soniox**.
 5. Enter your API key and region. The integration validates the key before it is saved.
 
-After STT/TTS platforms are implemented, pick the Soniox engines in **Settings → Voice assistants**.
+Then open **Settings → Voice assistants**, edit an assistant, and choose Soniox for Speech-to-text and Text-to-speech.
 
 HACS shows the installed version from `manifest.json` and available versions from GitHub Releases. Until the first Release is published, HACS falls back to the default branch (a commit hash, not SemVer).
 
@@ -36,11 +36,22 @@ Minimum Home Assistant version is `hacs.json` `homeassistant` (`2025.2.0`).
 
 ## Configuration
 
+Add the integration, then open **Configure** on the Soniox entry. The first step is speech-to-text; the second is text-to-speech. API key and region stay under **Reconfigure**.
+
 | Field | Stored in | Description |
 | --- | --- | --- |
 | API key | Config entry data | Soniox project API key. Never logged. |
 | Region | Config entry data | Data-residency endpoint: `us`, `eu`, `jp`, or `in`. |
-| STT/TTS options | Config entry options | Reserved for model, voice, language hints, context, endpointing, and translation. |
+| STT model | Config entry options | Realtime model, typically `stt-rt-v5`. |
+| Language hints | Config entry options | Extra ISO languages besides the Assist pipeline language. |
+| Context / custom terms | Config entry options | Background text and comma-separated words to bias recognition. |
+| Endpoint detection | Config entry options | Detect end of speech (default on; delay 500–3000 ms). |
+| Speaker diarization | Config entry options | Prefix speaker changes as `[1]`, `[2]`, … |
+| One-way translation | Config entry options | Translate the transcript into one target language. |
+| TTS model / voice | Config entry options | Realtime model (`tts-rt-v2`) and voice (shared name or cloned id). |
+| Speed / reduce silence | Config entry options | Speaking rate 0.7–1.3 and optional pause shortening. |
+
+Model and voice dropdowns come from the Soniox API. If a list is empty, enable **Model listing** in the [Soniox console](https://console.soniox.com) (and **Cloned voices** if you want clones), or type the model / voice name.
 
 YAML setup is not supported. Use the UI. Reauthentication and reconfigure flows are available if the key expires or you need to change region.
 

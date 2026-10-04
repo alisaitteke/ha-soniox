@@ -1,10 +1,11 @@
 """Tests for Soniox config entry setup and unload."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from soniox.errors import SonioxAuthenticationError, SonioxServerError
 
@@ -12,14 +13,11 @@ from custom_components.soniox import async_setup
 from custom_components.soniox.client import unique_id_from_api_key
 from custom_components.soniox.const import DOMAIN
 
-from .conftest import TEST_API_KEY, mock_config_entry_kwargs
+from .conftest import TEST_API_KEY, empty_catalog_client, mock_config_entry_kwargs
 
 
-def _mock_client() -> MagicMock:
-    client = MagicMock()
-    client.aclose = AsyncMock()
-    client.models.list = AsyncMock()
-    return client
+def _mock_client():
+    return empty_catalog_client()
 
 
 async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
@@ -42,6 +40,12 @@ async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
 
     assert entry.state is ConfigEntryState.LOADED
     assert entry.runtime_data.client is client
+    registry = er.async_get(hass)
+    domains = {
+        item.domain
+        for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    assert domains == {"stt", "tts"}
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
