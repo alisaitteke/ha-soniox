@@ -6,6 +6,8 @@ Public contributor notes for [ha-soniox](https://github.com/alisaitteke/ha-sonio
 
 Home Assistant **custom integration** (`custom_components/soniox`) for Soniox cloud STT and TTS. Users pick the engines in an Assist pipeline.
 
+The GitHub repository is **public**. HACS custom repositories must be public; do not treat this as a private repo.
+
 It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/LLM agent. Do not package it as an add-on.
 
 ## Layout
@@ -13,6 +15,7 @@ It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/
 - `custom_components/soniox/` — integration (required HACS layout)
 - `config/configuration.yaml` — local `hass` debug config only (`scripts/develop`)
 - `scripts/develop` — start local HA with `PYTHONPATH` to this repo
+- `scripts/check_version.py` — HACS/HA version lockstep (`manifest.json` == `pyproject.toml`)
 - `tests/` — pytest via `pytest-homeassistant-custom-component`
 - `.cursor/skills/ha-soniox/` — project skill for Cursor agents
 
@@ -27,12 +30,15 @@ It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/
 - Python changes require a Home Assistant Core restart.
 - Do not commit `.env`, `secrets.yaml`, `.venv/`, or anything under `config/` except `configuration.yaml`.
 - Do not `git push` or force-push unless the user asked.
+- Version source of truth is `custom_components/soniox/manifest.json` (`version`, SemVer, no `v` prefix). Keep `pyproject.toml` in lockstep. HACS installed version comes from that field; available versions come from **GitHub Releases**, not tags alone.
+- To ship: bump both version fields on `main`, then publish a GitHub Release whose tag is `vX.Y.Z` (or `X.Y.Z`) matching the manifest. Do not rewrite tags. Do not use `zip_release`.
 
 ## Local commands
 
 ```bash
 pytest
 ruff check .
+python3 scripts/check_version.py
 ./scripts/develop
 ```
 

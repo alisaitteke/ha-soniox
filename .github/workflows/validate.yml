@@ -24,6 +24,18 @@ jobs:
       - name: Run hassfest validation
         uses: home-assistant/actions/hassfest@master
 
+  version:
+    name: Version check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Check manifest and pyproject versions
+        run: python3 scripts/check_version.py
+
   hacs:
     name: HACS validation
     runs-on: ubuntu-latest

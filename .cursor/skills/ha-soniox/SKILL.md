@@ -11,15 +11,15 @@ description: >-
 
 Public Home Assistant custom integration for Soniox cloud speech-to-text and text-to-speech.
 
-Repository: https://github.com/alisaitteke/ha-soniox
+Repository: https://github.com/alisaitteke/ha-soniox (public GitHub; HACS requires this)
 Domain: `soniox`
-Type: HACS custom integration (`custom_components/soniox`). Not an add-on. Not Wyoming.
+Type: HACS custom integration (`custom_components/soniox`). Not an add-on. Not Wyoming. Do not treat the repo as private.
 
 ## File map
 
 | Path | Role |
 | --- | --- |
-| `custom_components/soniox/manifest.json` | Domain, version, `soniox==2.10.0`, loggers |
+| `custom_components/soniox/manifest.json` | Domain, SemVer `version` (no `v`; HA/HACS source of truth), `soniox==2.10.0`, loggers |
 | `custom_components/soniox/__init__.py` | Config-entry setup/unload, `runtime_data` |
 | `custom_components/soniox/config_flow.py` | API key + region, reauth, reconfigure, options skeleton |
 | `custom_components/soniox/client.py` | `AsyncSonioxClient` factory, credential check |
@@ -27,6 +27,7 @@ Type: HACS custom integration (`custom_components/soniox`). Not an add-on. Not W
 | `custom_components/soniox/stt.py` / `tts.py` | Placeholders; platforms not forwarded yet |
 | `custom_components/soniox/quality_scale.yaml` | Bronze/Silver/Gold tracking |
 | `scripts/develop` | Local `hass --debug` with `PYTHONPATH` |
+| `scripts/check_version.py` | Lockstep check: manifest == pyproject; on release, tag (strip `v`) must match |
 | `config/configuration.yaml` | Debug logger for `custom_components.soniox` |
 
 ## Hard rules
@@ -39,6 +40,7 @@ Type: HACS custom integration (`custom_components/soniox`). Not an add-on. Not W
 - Do not forward `Platform.STT` / `Platform.TTS` until the entities are implemented.
 - Core restart after Python edits. Frontend reload is not enough.
 - Do not push unless asked. Do not commit `.venv`, caches, or `config/` except `configuration.yaml`.
+- Bump `manifest.json` `version` and `pyproject.toml` together. Publish a GitHub Release (not a tag-only push) so HACS can version-check. Tag `vX.Y.Z` must match the manifest without the `v`.
 
 ## Assist / Soniox mapping
 
@@ -64,6 +66,7 @@ On HAOS, copy only `custom_components/soniox` to `/config/custom_components/soni
 ```bash
 pytest
 ruff check .
+python3 scripts/check_version.py
 ```
 
 Config flow tests mock `async_validate_api_credentials`. Setup tests mock the client. `tests/soniox_stubs.py` exists because older `pytest-homeassistant-custom-component` pins Pydantic v1; production HA 2025.2+ uses the real SDK.

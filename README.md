@@ -4,7 +4,7 @@ Custom Home Assistant integration for [Soniox](https://soniox.com) speech-to-tex
 
 This repository currently contains the **infrastructure** (config flow, client wrapper, quality-scale skeleton). Streaming STT/TTS is the next implementation phase and is not forwarded as platforms yet.
 
-This is a **custom integration**, not a Home Assistant add-on.
+This is a **community custom integration**. It is **not** an official Home Assistant add-on, **not** an official Soniox product, and is **not affiliated with, endorsed by, or maintained by Soniox**. The GitHub repository is **public** ([alisaitteke/ha-soniox](https://github.com/alisaitteke/ha-soniox)); HACS only tracks public repositories.
 
 ## Requirements
 
@@ -13,13 +13,26 @@ This is a **custom integration**, not a Home Assistant add-on.
 
 ## Installation (HACS)
 
-1. In HACS, add [this repository](https://github.com/alisaitteke/ha-soniox) as a custom integration.
+1. In HACS, add [this public repository](https://github.com/alisaitteke/ha-soniox) as a custom repository (category: Integration).
 2. Download **Soniox**.
 3. Restart Home Assistant.
 4. Go to **Settings → Devices & services → Add integration → Soniox**.
 5. Enter your API key and region. The integration validates the key before it is saved.
 
 After STT/TTS platforms are implemented, pick the Soniox engines in **Settings → Voice assistants**.
+
+HACS shows the installed version from `manifest.json` and available versions from GitHub Releases. Until the first Release is published, HACS falls back to the default branch (a commit hash, not SemVer).
+
+## Releases
+
+Ship from `main` only:
+
+1. Bump `custom_components/soniox/manifest.json` `version` and `pyproject.toml` `version` together (SemVer, no `v` prefix).
+2. Merge to `main`.
+3. Publish a GitHub Release whose tag is `vX.Y.Z` (or `X.Y.Z`) matching that version. Tags without a Release are not enough for HACS.
+4. CI checks the tag against the manifest. Do not force-move tags to rewrite the version.
+
+Minimum Home Assistant version is `hacs.json` `homeassistant` (`2025.2.0`).
 
 ## Configuration
 
@@ -61,6 +74,7 @@ Studio Code Server is for editing `/config` YAML. Keep this repository in Cursor
 ```bash
 pytest
 ruff check .
+python3 scripts/check_version.py
 ```
 
 Quality-scale progress is tracked in [`custom_components/soniox/quality_scale.yaml`](custom_components/soniox/quality_scale.yaml).
