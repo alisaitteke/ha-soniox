@@ -121,7 +121,7 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
                 hints.append(iso)
         return hints or None
 
-    def _context(self) -> StructuredContext | None:
+    def _structured_context(self) -> StructuredContext | None:
         """Return structured context when text or terms are set."""
         text = str(self._option(CONF_CONTEXT, "") or "").strip()
         terms_raw = str(self._option(CONF_CONTEXT_TERMS, "") or "")
@@ -146,7 +146,7 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
             sample_rate=int(metadata.sample_rate),
             num_channels=int(metadata.channel),
             language_hints=self._language_hints(metadata.language),
-            context=self._context(),
+            context=self._structured_context(),
             enable_endpoint_detection=bool(
                 self._option(
                     CONF_ENABLE_ENDPOINT_DETECTION, DEFAULT_ENABLE_ENDPOINT_DETECTION

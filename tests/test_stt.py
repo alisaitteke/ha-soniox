@@ -88,6 +88,12 @@ async def _pcm_stream(*chunks: bytes):
         yield chunk
 
 
+def test_stt_entity_does_not_shadow_ha_context() -> None:
+    """Entity._context is Home Assistant event provenance; do not override it."""
+    assert "_context" not in SonioxSpeechToTextEntity.__dict__
+    assert hasattr(SonioxSpeechToTextEntity, "_structured_context")
+
+
 def test_language_to_iso639_strips_region() -> None:
     """Assist BCP-47 tags map to ISO 639-1 for Soniox."""
     assert language_to_iso639("tr-TR") == "tr"
