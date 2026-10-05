@@ -19,4 +19,4 @@ ha-ffmpeg==3.2.2
 
 # aiodns 3.4.0 calls pycares.ares_query_a_result, which pycares 5 removed.
 # Home Assistant pins aiodns but not pycares, so constrain it here.
-pycares<5
+pycares<6
