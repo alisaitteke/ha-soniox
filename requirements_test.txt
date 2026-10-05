@@ -14,7 +14,7 @@ mypy>=1.13
 soniox==2.10.0
 
 # Required by homeassistant.components.tts on Home Assistant 2025.6.
-mutagen==1.47.0
+mutagen==1.48.1
 ha-ffmpeg==3.2.2
 
 # aiodns 3.4.0 calls pycares.ares_query_a_result, which pycares 5 removed.
