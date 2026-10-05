@@ -8,7 +8,7 @@ pytest>=8.0
 pytest-asyncio>=0.24
 pytest-cov>=5.0
 ruff>=0.9
-mypy>=1.13
+mypy>=2.4.0
 
 # Must match manifest.json.
 soniox==2.10.0
