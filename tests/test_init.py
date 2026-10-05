@@ -80,6 +80,8 @@ async def test_setup_and_unload_entry(hass: HomeAssistant) -> None:
 
     assert entry.state is ConfigEntryState.LOADED
     assert entry.runtime_data.client is client
+    # The credential-check client is the runtime client; setup must not close it.
+    client.aclose.assert_not_awaited()
     registry = er.async_get(hass)
     domains = {
         item.domain

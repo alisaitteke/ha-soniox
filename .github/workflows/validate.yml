@@ -89,15 +89,12 @@ jobs:
         with:
           python-version: "3.13"
 
-      # Pinned on purpose. A floating pin once resolved to a Home Assistant
-      # that pins Pydantic v1, which silently forced the suite to run against
-      # local SDK stubs instead of the real soniox package.
+      # Install from requirements_test.txt so CI keeps the same pins as local
+      # pytest, including pycares<5 (aiodns 3.4.0 vs pycares 5).
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --pre "pytest-homeassistant-custom-component==0.13.250" \
-            "soniox==2.10.0" "pytest-asyncio>=0.24" "pytest-cov>=5.0" \
-            "mutagen==1.47.0" "ha-ffmpeg==3.2.2"
+          python -m pip install -r requirements_test.txt
 
       - name: Verify the real Soniox SDK is importable
         run: python -c "import soniox.errors, soniox.types; print('soniox SDK OK')"

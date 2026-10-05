@@ -62,8 +62,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: SonioxConfigEntry) -> bo
 
     client = create_soniox_client(entry.data[CONF_API_KEY], region)
     keep_entry = False
+    # Close the probe client only when setup will not keep it. Success and
+    # quota-exhausted both store this same client on runtime_data, so closing
+    # whenever keep_entry is False also kills the working path.
+    close_client = True
     try:
         await async_check_client(client)
+        close_client = False
     except SonioxError as err:
         # SonioxPermissionDeniedError is a sibling of SonioxAuthenticationError
         # and both use HTTP 403, so the branches are checked by error_type
@@ -97,6 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SonioxConfigEntry) -> bo
             )
             await async_create_quota_issue(hass, entry, err)
             keep_entry = True
+            close_client = False
         elif isinstance(err, SonioxAuthenticationError):
             log_error(
                 _LOGGER,
@@ -127,7 +133,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SonioxConfigEntry) -> bo
         )
         raise ConfigEntryNotReady("Unable to connect to Soniox") from err
     finally:
-        if not keep_entry:
+        if close_client:
             await client.aclose()
 
     # Clear stale issues only once the credential check truly succeeded. Doing
