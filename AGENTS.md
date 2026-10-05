@@ -16,7 +16,7 @@ It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/
 - `config/configuration.yaml` — local `hass` debug config only (`scripts/develop`)
 - `scripts/develop` — start local HA with `PYTHONPATH` to this repo
 - `scripts/check_version.py` — HACS/HA version lockstep (`manifest.json` == `pyproject.toml`)
-- `tests/` — pytest via `pytest-homeassistant-custom-component`
+- `tests/` — pytest via a **pinned** `pytest-homeassistant-custom-component` (Pydantic v2, real SDK)
 - `.cursor/skills/ha-soniox/` — project skill for Cursor agents
 
 ## Rules
@@ -24,9 +24,18 @@ It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/
 - UI config flow only. No YAML setup (`config_entry_only_config_schema`).
 - `ConfigEntry.data`: `api_key`, `region`. `ConfigEntry.options`: STT/TTS settings.
 - Thin wrapper around official `soniox` SDK (`AsyncSonioxClient`). No raw WebSocket clients.
+- Branch on Soniox `error_type`, never on exception class alone. `SonioxPermissionDeniedError`
+  is a sibling of `SonioxAuthenticationError`; both are HTTP 403.
+- Config entry `unique_id` is random. Never derive it from the API key, or key rotation
+  will lock users out of reauthentication.
 - Store the client on `entry.runtime_data`, not `hass.data`.
-- Never log API keys or write them to diagnostics without redaction.
-- Do not forward STT/TTS platforms until those entities are implemented. Current `__init__.py` only validates credentials and unloads the client.
+- Never log API keys. Redact the API key AND the unique id in diagnostics.
+- Quota/permission problems become repair issues, never silent retry loops.
+- Log every failure through `exceptions.log_error` / `log_api_error` /
+  `log_realtime_error` so each line carries `error_type`, HTTP status and
+  `request_id`. Never log the API key. `info` for lifecycle, `debug` for
+  per-request settings, `error` only for real failures.
+- STT/TTS platforms are forwarded; entities exist and are Assist-ready.
 - Python changes require a Home Assistant Core restart.
 - Do not commit `.env`, `secrets.yaml`, `.venv/`, or anything under `config/` except `configuration.yaml`.
 - Do not `git push` or force-push unless the user asked.
@@ -36,8 +45,10 @@ It is **not** a Supervisor add-on, not a Wyoming server, and not a conversation/
 ## Local commands
 
 ```bash
+pip install -r requirements_test.txt
 pytest
 ruff check .
+mypy
 python3 scripts/check_version.py
 ./scripts/develop
 ```
@@ -46,8 +57,6 @@ Local UI: http://localhost:8123
 
 ## Next implementation order
 
-1. STT entity (`async_process_audio_stream`, Assist 16 kHz PCM, endpoint detection)
-2. TTS one-shot + streaming
-3. Options: language hints, context, translation, diarization formatting, speed
-4. Diagnostics extras / optional usage sensors
-5. Voice cloning (later)
+1. Proxy / custom CA support (blocked: the SDK builds its own HTTP client)
+2. Optional usage and cost sensors (`client.usage.summary`, `concurrency_limits`)
+3. Voice cloning (later)

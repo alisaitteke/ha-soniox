@@ -10,5 +10,10 @@ homeassistant:
 logger:
   default: info
   logs:
+    # debug shows the model, voice, language and endpoint settings used for
+    # every STT/TTS request. Set to info to only see failures and setup events.
     custom_components.soniox: debug
+    # The SDK itself does not log; this only surfaces httpx/websockets frames.
     soniox: debug
+    httpx: warning
+    httpcore: warning

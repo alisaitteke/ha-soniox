@@ -10,6 +10,7 @@ from soniox import AsyncSonioxClient
 from soniox.errors import SonioxError, SonioxPermissionDeniedError
 
 from .const import DEFAULT_TTS_MODEL, DEFAULT_TTS_VOICE
+from .exceptions import log_api_error
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,6 +26,17 @@ class SonioxCatalog:
     tts_models: list[SelectOptionDict] = field(default_factory=list)
     voices: list[SelectOptionDict] = field(default_factory=list)
     missing_permissions: list[str] = field(default_factory=list)
+    # model_id -> whether the model accepts max_endpoint_delay_ms
+    supports_max_endpoint_delay: dict[str, bool] = field(default_factory=dict)
+
+    def allows_max_endpoint_delay(self, model_id: str) -> bool:
+        """Return True when a model accepts max_endpoint_delay_ms.
+
+        Unknown models are allowed through: a missing capability flag must not
+        silently drop a setting the user configured, and Soniox only rejects
+        the option on models that explicitly report no support.
+        """
+        return self.supports_max_endpoint_delay.get(model_id, True)
 
 
 def _is_permission_denied(err: Exception) -> bool:
@@ -69,24 +81,34 @@ async def async_load_catalog(client: AsyncSonioxClient) -> SonioxCatalog:
     seen_voices: set[str] = set()
 
     try:
-        response = await client.models.list()
-        for model in getattr(response, "models", []) or []:
-            if getattr(model, "transcription_mode", None) != "real_time":
-                continue
-            if getattr(model, "aliased_model_id", None):
-                continue
-            if getattr(model, "id", None):
+        stt_response = await client.models.list()
+        for model in getattr(stt_response, "models", []) or []:
+            model_id = getattr(model, "id", None)
+            supports_delay = getattr(model, "supports_max_endpoint_delay", None)
+            if isinstance(model_id, str) and model_id:
+                if isinstance(supports_delay, bool):
+                    catalog.supports_max_endpoint_delay[model_id] = supports_delay
+                if getattr(model, "transcription_mode", None) != "real_time":
+                    continue
+                if getattr(model, "aliased_model_id", None):
+                    continue
                 catalog.stt_models.append(_model_option(model))
     except SonioxError as err:
         if _is_permission_denied(err):
             catalog.missing_permissions.append(PERM_MODEL_LISTING)
+            _LOGGER.warning(
+                "Soniox key cannot list STT models (permission missing); "
+                "model and voice fields fall back to free text"
+            )
         else:
-            _LOGGER.exception("Unable to list Soniox STT models")
+            log_api_error(
+                _LOGGER, "Could not list Soniox STT models", err
+            )
             catalog.missing_permissions.append(PERM_MODEL_LISTING)
 
     try:
-        response = await client.tts_models.list()
-        for model in getattr(response, "models", []) or []:
+        tts_response = await client.tts_models.list()
+        for model in getattr(tts_response, "models", []) or []:
             if getattr(model, "aliased_model_id", None):
                 continue
             if getattr(model, "id", None):
@@ -102,14 +124,20 @@ async def async_load_catalog(client: AsyncSonioxClient) -> SonioxCatalog:
         if _is_permission_denied(err):
             if PERM_MODEL_LISTING not in catalog.missing_permissions:
                 catalog.missing_permissions.append(PERM_MODEL_LISTING)
+            _LOGGER.warning(
+                "Soniox key cannot list TTS models (permission missing); "
+                "model and voice fields fall back to free text"
+            )
         else:
-            _LOGGER.exception("Unable to list Soniox TTS models")
+            log_api_error(
+                _LOGGER, "Could not list Soniox TTS models", err
+            )
             if PERM_MODEL_LISTING not in catalog.missing_permissions:
                 catalog.missing_permissions.append(PERM_MODEL_LISTING)
 
     try:
-        response = await client.voices.list()
-        for voice in getattr(response, "voices", []) or []:
+        voices_response = await client.voices.list()
+        for voice in getattr(voices_response, "voices", []) or []:
             voice_id = str(getattr(voice, "id", ""))
             name = str(getattr(voice, "name", "") or voice_id)
             _add_unique_voice(
@@ -118,8 +146,21 @@ async def async_load_catalog(client: AsyncSonioxClient) -> SonioxCatalog:
     except SonioxError as err:
         if _is_permission_denied(err):
             catalog.missing_permissions.append(PERM_CLONED_VOICES)
+            _LOGGER.debug(
+                "Soniox key cannot list cloned voices (permission missing); "
+                "only shared voices are offered"
+            )
         else:
             _LOGGER.debug("Unable to list cloned Soniox voices: %s", err)
+
+    _LOGGER.debug(
+        "Soniox catalog loaded: stt_models=%s tts_models=%s voices=%s "
+        "missing_permissions=%s",
+        len(catalog.stt_models),
+        len(catalog.tts_models),
+        len(catalog.voices),
+        catalog.missing_permissions or "none",
+    )
 
     if not catalog.voices:
         _add_unique_voice(catalog.voices, seen_voices, DEFAULT_TTS_VOICE, None)

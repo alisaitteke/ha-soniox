@@ -131,6 +131,26 @@ REGIONS: Final = ("us", "eu", "jp", "in")
 
 SONIOX_CONSOLE_URL: Final = "https://console.soniox.com"
 
+# The SDK defaults to 30s. Config-flow validation must feel responsive, and
+# long STT/TTS calls are bounded by their own stream timeouts.
+REQUEST_TIMEOUT_SEC: Final = 30.0
+VALIDATION_TIMEOUT_SEC: Final = 10.0
+
+# Soniox error_type values that mean "this key/project cannot do work right
+# now" rather than "this is a transient network problem". Retrying these in a
+# loop hides the real cause, so they are surfaced as repair issues instead.
+QUOTA_ERROR_TYPES: Final[frozenset[str]] = frozenset(
+    {
+        "organization_balance_exhausted",
+        "project_monthly_budget_exhausted",
+        "limit_exceeded",
+    }
+)
+
+ISSUE_QUOTA_EXHAUSTED: Final = "quota_exhausted"
+ISSUE_PERMISSION_DENIED: Final = "permission_denied"
+ISSUE_PYTHON_REGRESSION: Final = "python_realtime_regression"
+
 DEFAULT_OPTIONS: Final[dict[str, Any]] = {
     CONF_STT_MODEL: DEFAULT_STT_MODEL,
     CONF_TTS_MODEL: DEFAULT_TTS_MODEL,
@@ -206,9 +226,15 @@ __all__ = [
     "DEFAULT_TTS_SPEED",
     "DEFAULT_TTS_VOICE",
     "DOMAIN",
+    "ISSUE_PERMISSION_DENIED",
+    "ISSUE_PYTHON_REGRESSION",
+    "ISSUE_QUOTA_EXHAUSTED",
     "LANGUAGE_HINTS",
+    "QUOTA_ERROR_TYPES",
+    "REQUEST_TIMEOUT_SEC",
     "SUPPORTED_LANGUAGES",
     "REGIONS",
     "REGION_ENDPOINTS",
     "SONIOX_CONSOLE_URL",
+    "VALIDATION_TIMEOUT_SEC",
 ]

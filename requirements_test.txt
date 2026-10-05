@@ -1,8 +1,22 @@
+# Pinned on purpose: a floating pin previously resolved to a Home Assistant
+# that pins Pydantic v1, which silently forced the suite to run against local
+# soniox SDK stubs instead of the real package. 0.13.250 tracks Home Assistant
+# 2025.6, which is also the minimum this integration supports.
+pytest-homeassistant-custom-component==0.13.250
+
 pytest>=8.0
 pytest-asyncio>=0.24
-pytest-homeassistant-custom-component>=0.13
+pytest-cov>=5.0
 ruff>=0.9
 mypy>=1.13
+
+# Must match manifest.json.
 soniox==2.10.0
+
+# Required by homeassistant.components.tts on Home Assistant 2025.6.
 mutagen==1.47.0
 ha-ffmpeg==3.2.2
+
+# aiodns 3.4.0 calls pycares.ares_query_a_result, which pycares 5 removed.
+# Home Assistant pins aiodns but not pycares, so constrain it here.
+pycares<5

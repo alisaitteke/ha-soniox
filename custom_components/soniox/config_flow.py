@@ -29,7 +29,7 @@ from .catalog import PERM_MODEL_LISTING, SonioxCatalog, async_load_catalog
 from .client import (
     async_validate_api_credentials,
     create_soniox_client,
-    unique_id_from_api_key,
+    new_unique_id,
 )
 from .const import (
     CONF_CONTEXT,
@@ -61,6 +61,11 @@ from .const import (
     DOMAIN,
     LANGUAGE_HINTS,
     SONIOX_CONSOLE_URL,
+)
+from .exceptions import (
+    is_permission_denied,
+    is_quota_exhausted,
+    log_error,
 )
 from .models import SonioxConfigEntry
 
@@ -150,9 +155,45 @@ async def _async_validate(user_input: dict[str, Any]) -> dict[str, str]:
         await async_validate_api_credentials(
             user_input[CONF_API_KEY], user_input[CONF_REGION]
         )
-    except SonioxAuthenticationError:
-        return {"base": "invalid_auth"}
-    except (httpx.ConnectError, httpx.TimeoutException, SonioxError):
+    except SonioxError as err:
+        # Order matters. SonioxPermissionDeniedError is a sibling of
+        # SonioxAuthenticationError, not a subclass, and both carry HTTP 403:
+        # "no permission" means the key works, so it must not be reported as an
+        # invalid key and must not send the user back to the console for a key
+        # that is already correct.
+        if is_permission_denied(err):
+            log_error(
+                _LOGGER,
+                "Soniox key lacks a permission during setup; continuing with "
+                "free-text model and voice fields",
+                err,
+                region=user_input.get(CONF_REGION),
+            )
+            return {}
+        if is_quota_exhausted(err):
+            log_error(
+                _LOGGER,
+                "Soniox quota is exhausted; cannot finish setup",
+                err,
+                region=user_input.get(CONF_REGION),
+            )
+            return {"base": "quota_exhausted"}
+        if isinstance(err, SonioxAuthenticationError):
+            log_error(
+                _LOGGER,
+                "Soniox rejected the API key",
+                err,
+                region=user_input.get(CONF_REGION),
+            )
+            return {"base": "invalid_auth"}
+        log_error(
+            _LOGGER,
+            "Could not reach Soniox to validate the API key",
+            err,
+            region=user_input.get(CONF_REGION),
+        )
+        return {"base": "cannot_connect"}
+    except (httpx.ConnectError, httpx.TimeoutException):
         return {"base": "cannot_connect"}
     except Exception:
         _LOGGER.exception("Unexpected error validating Soniox credentials")
@@ -173,10 +214,13 @@ class SonioxConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await _async_validate(user_input)
             if not errors:
-                await self.async_set_unique_id(
-                    unique_id_from_api_key(user_input[CONF_API_KEY])
-                )
+                # The unique id is random so a rotated key stays valid, which
+                # means duplicate detection must compare the stored key.
+                await self.async_set_unique_id(new_unique_id())
                 self._abort_if_unique_id_configured()
+                for entry in self._async_current_entries():
+                    if entry.data.get(CONF_API_KEY) == user_input[CONF_API_KEY]:
+                        return self.async_abort(reason="already_configured")
                 return self.async_create_entry(
                     title="Soniox",
                     data={
@@ -201,7 +245,12 @@ class SonioxConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Ask for a new API key."""
+        """Ask for a new API key.
+
+        The new key is accepted unconditionally: Soniox exposes no endpoint
+        that identifies the account behind a key, so comparing keys would only
+        ever reject a legitimate rotation.
+        """
         reauth_entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -209,10 +258,6 @@ class SonioxConfigFlow(ConfigFlow, domain=DOMAIN):
             payload = {CONF_API_KEY: user_input[CONF_API_KEY], CONF_REGION: region}
             errors = await _async_validate(payload)
             if not errors:
-                await self.async_set_unique_id(
-                    unique_id_from_api_key(user_input[CONF_API_KEY])
-                )
-                self._abort_if_unique_id_mismatch(reason="wrong_account")
                 return self.async_update_reload_and_abort(
                     reauth_entry,
                     data_updates={CONF_API_KEY: user_input[CONF_API_KEY]},
@@ -240,10 +285,6 @@ class SonioxConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors = await _async_validate(user_input)
             if not errors:
-                await self.async_set_unique_id(
-                    unique_id_from_api_key(user_input[CONF_API_KEY])
-                )
-                self._abort_if_unique_id_mismatch(reason="wrong_account")
                 return self.async_update_reload_and_abort(
                     reconfigure_entry,
                     data_updates={
@@ -282,12 +323,16 @@ class SonioxOptionsFlow(OptionsFlow):
         self._stt_options: dict[str, Any] = {}
 
     async def _async_catalog(self) -> SonioxCatalog:
-        """Load models and voices, creating a temporary client if needed."""
+        """Load models and voices, reusing the runtime cache when available."""
         if self._catalog is not None:
             return self._catalog
         runtime = getattr(self.config_entry, "runtime_data", None)
         if runtime is not None:
-            self._catalog = await async_load_catalog(runtime.client)
+            if runtime.catalog is not None:
+                self._catalog = runtime.catalog
+            else:
+                self._catalog = await async_load_catalog(runtime.client)
+                runtime.catalog = self._catalog
             return self._catalog
         client = create_soniox_client(
             self.config_entry.data[CONF_API_KEY],
@@ -324,15 +369,38 @@ class SonioxOptionsFlow(OptionsFlow):
 
         catalog = await self._async_catalog()
         current = {**DEFAULT_OPTIONS, **self.config_entry.options}
+        # Without the Model listing permission the API returns nothing useful,
+        # so fall back to a free-text field instead of an empty dropdown.
+        model_field: Any = TextSelector()
         if catalog.stt_models and PERM_MODEL_LISTING not in catalog.missing_permissions:
             model_field = SelectSelector(
                 SelectSelectorConfig(
                     options=catalog.stt_models,
                     mode=SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
                 )
             )
-        else:
-            model_field = TextSelector()
+        endpoint_fields: dict[Any, Any] = {}
+        if catalog.allows_max_endpoint_delay(
+            str(_option(current, CONF_STT_MODEL, DEFAULT_STT_MODEL))
+        ):
+            endpoint_fields = {
+                vol.Required(
+                    CONF_MAX_ENDPOINT_DELAY_MS,
+                    default=_option(
+                        current,
+                        CONF_MAX_ENDPOINT_DELAY_MS,
+                        DEFAULT_MAX_ENDPOINT_DELAY_MS,
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=500,
+                        max=3000,
+                        step=100,
+                        unit_of_measurement="ms",
+                    )
+                ),
+            }
         schema = vol.Schema(
             {
                 vol.Required(
@@ -365,22 +433,7 @@ class SonioxOptionsFlow(OptionsFlow):
                         DEFAULT_ENABLE_ENDPOINT_DETECTION,
                     ),
                 ): BooleanSelector(),
-                vol.Required(
-                    CONF_MAX_ENDPOINT_DELAY_MS,
-                    default=_option(
-                        current,
-                        CONF_MAX_ENDPOINT_DELAY_MS,
-                        DEFAULT_MAX_ENDPOINT_DELAY_MS,
-                    ),
-                ): NumberSelector(
-                    NumberSelectorConfig(
-                        min=500,
-                        max=3000,
-                        step=100,
-                        unit_of_measurement="ms",
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
+                **endpoint_fields,
                 vol.Required(
                     CONF_ENABLE_DIARIZATION,
                     default=_option(
@@ -423,15 +476,16 @@ class SonioxOptionsFlow(OptionsFlow):
 
         catalog = await self._async_catalog()
         current = {**DEFAULT_OPTIONS, **self.config_entry.options}
+        model_field: Any = TextSelector()
         if catalog.tts_models and PERM_MODEL_LISTING not in catalog.missing_permissions:
             model_field = SelectSelector(
                 SelectSelectorConfig(
                     options=catalog.tts_models,
                     mode=SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
                 )
             )
-        else:
-            model_field = TextSelector()
+        voice_field: Any = TextSelector()
         if catalog.voices and PERM_MODEL_LISTING not in catalog.missing_permissions:
             voice_field = SelectSelector(
                 SelectSelectorConfig(
@@ -440,8 +494,6 @@ class SonioxOptionsFlow(OptionsFlow):
                     custom_value=True,
                 )
             )
-        else:
-            voice_field = TextSelector()
         schema = vol.Schema(
             {
                 vol.Required(

@@ -7,11 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.const import CONF_API_KEY
 
-from tests.soniox_stubs import install_soniox_stubs_if_needed
-
-install_soniox_stubs_if_needed()
-
-from custom_components.soniox.const import (  # noqa: E402, PLC0415
+# Import the real SDK eagerly. Stubbing it previously made the suite pass while
+# exercising none of the pydantic validation the production code relies on.
+from custom_components.soniox.const import (
     CONF_REGION,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -21,6 +19,8 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 
 TEST_API_KEY = "sk_test_soniox_key"
 TEST_REGION = "us"
+# A config entry unique id is a random value now, not a hash of the API key.
+TEST_UNIQUE_ID = "0123456789abcdef0123456789abcdef"
 
 
 def empty_catalog_client() -> MagicMock:

@@ -9,10 +9,15 @@ from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from soniox.errors import SonioxAuthenticationError, SonioxServerError
+from soniox.errors import (
+    SonioxAPIError,
+    SonioxAuthenticationError,
+    SonioxPermissionDeniedError,
+    SonioxServerError,
+)
+from soniox.types import ApiError
 
 from custom_components.soniox.catalog import SonioxCatalog
-from custom_components.soniox.client import unique_id_from_api_key
 from custom_components.soniox.const import (
     CONF_REGION,
     DEFAULT_OPTIONS,
@@ -22,7 +27,12 @@ from custom_components.soniox.const import (
     SONIOX_CONSOLE_URL,
 )
 
-from .conftest import TEST_API_KEY, TEST_REGION, mock_config_entry_kwargs
+from .conftest import (
+    TEST_API_KEY,
+    TEST_REGION,
+    TEST_UNIQUE_ID,
+    mock_config_entry_kwargs,
+)
 
 
 async def test_user_form_creates_entry(
@@ -46,7 +56,10 @@ async def test_user_form_creates_entry(
     assert result["title"] == "Soniox"
     assert result["data"] == {CONF_API_KEY: TEST_API_KEY, CONF_REGION: TEST_REGION}
     assert result["options"] == DEFAULT_OPTIONS
-    assert result["result"].unique_id == unique_id_from_api_key(TEST_API_KEY)
+    # The unique id is random, so it cannot leak or depend on the API key.
+    unique_id = result["result"].unique_id
+    assert unique_id and TEST_API_KEY not in unique_id
+    assert len(unique_id) == 32
     assert result["options"]["stt_model"] == DEFAULT_STT_MODEL
     assert result["options"]["tts_model"] == DEFAULT_TTS_MODEL
     mock_validate_credentials.assert_awaited_once()
@@ -89,14 +102,18 @@ async def test_user_form_errors(
     await hass.async_block_till_done()
 
 
-async def test_unique_id_prevents_duplicate(
+async def test_same_api_key_cannot_be_added_twice(
     hass: HomeAssistant, mock_validate_credentials: AsyncMock
 ) -> None:
-    """The same API key cannot be configured twice."""
+    """The same API key cannot be configured twice.
+
+    The unique id is random, so the duplicate check matches on the stored key
+    instead. Key rotation stays possible through reauthentication.
+    """
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -112,6 +129,133 @@ async def test_unique_id_prevents_duplicate(
     assert result["reason"] == "already_configured"
 
 
+async def test_reauth_accepts_a_rotated_api_key(
+    hass: HomeAssistant, mock_validate_credentials: AsyncMock
+) -> None:
+    """A key the user rotated in the console must be accepted.
+
+    The unique id used to be a hash of the API key, so a rotation aborted the
+    flow with wrong_account and locked the user out of reauthentication.
+    """
+    entry = MockConfigEntry(
+        **{
+            **mock_config_entry_kwargs(),
+            "unique_id": TEST_UNIQUE_ID,
+        }
+    )
+    entry.add_to_hass(hass)
+    rotated = "sk_rotated_replacement_key"
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": SOURCE_REAUTH,
+            "entry_id": entry.entry_id,
+            "unique_id": entry.unique_id,
+        },
+        data=entry.data,
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "reauth_confirm"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_API_KEY: rotated}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert entry.data[CONF_API_KEY] == rotated
+    # The unique id must survive so the entry keeps its identity.
+    assert entry.unique_id == TEST_UNIQUE_ID
+    # The update reloads the entry; let the reload finish before teardown.
+    await hass.async_block_till_done()
+
+
+async def test_reconfigure_accepts_a_rotated_api_key(
+    hass: HomeAssistant, mock_validate_credentials: AsyncMock
+) -> None:
+    """Reconfigure must also accept a different key than the stored one."""
+    entry = MockConfigEntry(
+        **{
+            **mock_config_entry_kwargs(),
+            "unique_id": TEST_UNIQUE_ID,
+        }
+    )
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_API_KEY: "sk_another_key", CONF_REGION: "eu"},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_API_KEY] == "sk_another_key"
+    assert entry.data[CONF_REGION] == "eu"
+    # The update reloads the entry; let the reload finish before teardown.
+    await hass.async_block_till_done()
+
+
+def _api_error(status_code: int, error_type: str, message: str) -> ApiError:
+    """Build the SDK's structured error payload for a failed response."""
+    return ApiError(
+        status_code=status_code,
+        error_type=error_type,
+        message=message,
+        request_id=f"req-{error_type}",
+    )
+
+
+def _permission_denied() -> SonioxPermissionDeniedError:
+    """Build the SDK error a valid-but-restricted key produces (HTTP 403)."""
+    api_error = _api_error(
+        403, "permission_denied", "The API key does not have permission."
+    )
+    response = httpx.Response(403, json=api_error.model_dump())
+    return SonioxPermissionDeniedError(
+        "permission denied", api_error=api_error, response=response
+    )
+
+
+def _quota_error() -> SonioxAPIError:
+    """Build the SDK error for an exhausted balance (HTTP 429)."""
+    api_error = _api_error(
+        429, "organization_balance_exhausted", "Organization balance exhausted."
+    )
+    response = httpx.Response(429, json=api_error.model_dump())
+    return SonioxAPIError("balance exhausted", api_error=api_error, response=response)
+
+
+async def test_permission_denied_is_not_an_invalid_key(
+    hass: HomeAssistant, mock_validate_credentials: AsyncMock
+) -> None:
+    """A 403 permission_denied means the key is valid, so setup must proceed."""
+    mock_validate_credentials.side_effect = _permission_denied()
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_API_KEY: TEST_API_KEY, CONF_REGION: TEST_REGION},
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_quota_exhausted_shows_its_own_error(
+    hass: HomeAssistant, mock_validate_credentials: AsyncMock
+) -> None:
+    """An exhausted balance is reported as a quota problem, not a connection one."""
+    mock_validate_credentials.side_effect = _quota_error()
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_API_KEY: TEST_API_KEY, CONF_REGION: TEST_REGION},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "quota_exhausted"}
+
+
 async def test_reauth_updates_api_key(
     hass: HomeAssistant, mock_validate_credentials: AsyncMock
 ) -> None:
@@ -119,7 +263,7 @@ async def test_reauth_updates_api_key(
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -148,7 +292,7 @@ async def test_reauth_invalid_auth_recovers(
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -183,7 +327,7 @@ async def test_reconfigure_updates_region(
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -210,7 +354,7 @@ async def test_options_flow_starts_at_stt(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)

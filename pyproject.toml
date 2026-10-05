@@ -1,6 +1,6 @@
 [project]
 name = "ha-soniox"
-version = "0.1.3"
+version = "0.1.4"
 description = "Home Assistant custom integration for Soniox STT and TTS"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -30,7 +30,6 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
-"tests/soniox_stubs.py" = ["PLC0415"]
 "tests/conftest.py" = ["E402", "PLC0415"]
 
 [tool.ruff.lint.isort]

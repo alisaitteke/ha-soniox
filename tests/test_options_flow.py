@@ -10,7 +10,6 @@ from homeassistant.helpers.selector import SelectSelector, TextSelector
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.soniox.catalog import SonioxCatalog
-from custom_components.soniox.client import unique_id_from_api_key
 from custom_components.soniox.const import (
     CONF_CONTEXT,
     CONF_CONTEXT_TERMS,
@@ -32,7 +31,10 @@ from custom_components.soniox.const import (
     SONIOX_CONSOLE_URL,
 )
 
-from .conftest import TEST_API_KEY, mock_config_entry_kwargs
+from .conftest import (
+    TEST_UNIQUE_ID,
+    mock_config_entry_kwargs,
+)
 
 
 def _schema_field(schema: object, key: str) -> object:
@@ -87,7 +89,7 @@ async def test_options_flow_dropdowns_from_catalog(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -140,7 +142,7 @@ async def test_options_flow_permission_denied_uses_text_fields(
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)
@@ -186,7 +188,7 @@ async def test_options_flow_keeps_default_options(hass: HomeAssistant) -> None:
     entry = MockConfigEntry(
         **{
             **mock_config_entry_kwargs(),
-            "unique_id": unique_id_from_api_key(TEST_API_KEY),
+            "unique_id": TEST_UNIQUE_ID,
         }
     )
     entry.add_to_hass(hass)

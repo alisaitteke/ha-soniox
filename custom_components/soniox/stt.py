@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterable
+from typing import Any
 
 from homeassistant.components.stt import (
     AudioBitRates,
@@ -40,7 +41,13 @@ from .const import (
     DEFAULT_STT_MODEL,
     SUPPORTED_LANGUAGES,
 )
-from .models import SonioxConfigEntry, language_to_iso639, soniox_device_info
+from .exceptions import log_realtime_error
+from .models import (
+    SonioxConfigEntry,
+    language_to_iso639,
+    model_supports_max_endpoint_delay,
+    soniox_device_info,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -100,7 +107,7 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
         """Return supported channel counts."""
         return [AudioChannels.CHANNEL_MONO]
 
-    def _option(self, key: str, default: object) -> object:
+    def _option(self, key: str, default: Any) -> Any:
         """Return a stored option, falling back for older entries."""
         options = self._entry.options
         if key not in options or options[key] is None:
@@ -108,13 +115,21 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
         return options[key]
 
     def _language_hints(self, assist_language: str) -> list[str] | None:
-        """Merge option hints with the Assist pipeline language."""
+        """Merge option hints with the Assist pipeline language.
+
+        Soniox validates ``language_hints`` as two-letter ISO 639-1 codes, so
+        every value is normalized before it reaches the SDK.
+        """
         hints: list[str] = []
         seen: set[str] = set()
         stored = self._option(CONF_LANGUAGE_HINTS, [])
+        raw_values: list[Any] = []
         if isinstance(stored, str):
-            stored = [part.strip() for part in stored.split(",") if part.strip()]
-        for raw in [*(stored or []), assist_language]:
+            raw_values = [part.strip() for part in stored.split(",") if part.strip()]
+        elif isinstance(stored, list | tuple):
+            raw_values = list(stored)
+        raw_values.append(assist_language)
+        for raw in raw_values:
             iso = language_to_iso639(str(raw)) if raw else ""
             if iso and iso not in seen:
                 seen.add(iso)
@@ -140,26 +155,36 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
 
     def _realtime_config(self, metadata: SpeechMetadata) -> RealtimeSTTConfig:
         """Build the realtime session config from entry options."""
-        return RealtimeSTTConfig(
-            model=str(self._option(CONF_STT_MODEL, DEFAULT_STT_MODEL)),
+        model = str(self._option(CONF_STT_MODEL, DEFAULT_STT_MODEL))
+        endpoint_enabled = bool(
+            self._option(
+                CONF_ENABLE_ENDPOINT_DETECTION, DEFAULT_ENABLE_ENDPOINT_DETECTION
+            )
+        )
+        config: RealtimeSTTConfig = RealtimeSTTConfig(
+            model=model,
             audio_format="pcm_s16le",
             sample_rate=int(metadata.sample_rate),
             num_channels=int(metadata.channel),
             language_hints=self._language_hints(metadata.language),
             context=self._structured_context(),
-            enable_endpoint_detection=bool(
-                self._option(
-                    CONF_ENABLE_ENDPOINT_DETECTION, DEFAULT_ENABLE_ENDPOINT_DETECTION
-                )
-            ),
-            max_endpoint_delay_ms=int(
-                self._option(CONF_MAX_ENDPOINT_DELAY_MS, DEFAULT_MAX_ENDPOINT_DELAY_MS)
-            ),
+            enable_endpoint_detection=endpoint_enabled,
             enable_speaker_diarization=bool(
                 self._option(CONF_ENABLE_DIARIZATION, DEFAULT_ENABLE_DIARIZATION)
             ),
             translation=self._translation(),
         )
+        # Soniox models expose supports_max_endpoint_delay; sending the option
+        # to a model without it fails the request instead of being ignored.
+        if endpoint_enabled and model_supports_max_endpoint_delay(
+            model, self._entry
+        ):
+            config.max_endpoint_delay_ms = int(
+                self._option(
+                    CONF_MAX_ENDPOINT_DELAY_MS, DEFAULT_MAX_ENDPOINT_DELAY_MS
+                )
+            )
+        return config
 
     def _append_final_token(
         self,
@@ -192,6 +217,20 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
         got_audio = False
         last_speaker: str | None = None
         diarization = bool(config.enable_speaker_diarization)
+        translation = self._translation()
+        _LOGGER.debug(
+            "Starting Soniox STT session: model=%s language=%s sample_rate=%s "
+            "channels=%s endpoint_detection=%s diarization=%s "
+            "translation=%s hints=%s",
+            config.model,
+            metadata.language,
+            metadata.sample_rate,
+            metadata.channel,
+            config.enable_endpoint_detection,
+            diarization,
+            getattr(translation, "target_language", None),
+            config.language_hints,
+        )
 
         try:
             async with client.realtime.stt.connect(config=config) as session:
@@ -209,9 +248,15 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
                 try:
                     async for event in session.receive_events():
                         if event.error_code or event.error_message:
+                            # Soniox reports realtime failures in the stream
+                            # itself rather than by raising, so the error is
+                            # logged here and the caller gets an error result.
                             _LOGGER.error(
-                                "Soniox STT error: %s",
-                                event.error_message or event.error_code,
+                                "Soniox STT stream reported an error: %s (code=%s, "
+                                "model=%s)",
+                                event.error_message,
+                                event.error_code,
+                                config.model,
                             )
                             return SpeechResult(None, SpeechResultState.ERROR)
                         for token in event.tokens:
@@ -227,11 +272,29 @@ class SonioxSpeechToTextEntity(SpeechToTextEntity):
                             break
                 finally:
                     await pump_task
-        except SonioxError:
-            _LOGGER.exception("Soniox STT request failed")
+        except SonioxError as err:
+            log_realtime_error(
+                _LOGGER,
+                "Soniox STT session failed",
+                err,
+                model=config.model,
+            )
             return SpeechResult(None, SpeechResultState.ERROR)
 
         text = "".join(texts).strip()
-        if not got_audio or not text:
+        if not text:
+            # An empty transcript is common when the user says nothing or the
+            # model rejects the audio, so it is logged to aid debugging but is
+            # not treated as an error worth a traceback.
+            _LOGGER.debug(
+                "Soniox STT returned no speech (audio_received=%s, model=%s)",
+                got_audio,
+                config.model,
+            )
             return SpeechResult(None, SpeechResultState.ERROR)
+        _LOGGER.debug(
+            "Soniox STT transcript ready (characters=%s, model=%s)",
+            len(text),
+            config.model,
+        )
         return SpeechResult(text, SpeechResultState.SUCCESS)

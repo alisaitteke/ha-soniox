@@ -3,13 +3,13 @@
     "abort": {
       "already_configured": "Soniox is already configured.",
       "reauth_successful": "Re-authentication was successful",
-      "reconfigure_successful": "Re-configuration was successful",
-      "wrong_account": "The API key does not match the existing Soniox account."
+      "reconfigure_successful": "Re-configuration was successful"
     },
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "unknown": "Unexpected error",
+      "quota_exhausted": "The Soniox project balance or budget is exhausted. Add credit or raise the budget in the Soniox console, then try again."
     },
     "step": {
       "user": {
@@ -103,6 +103,20 @@
       "soniox_tts": {
         "name": "Text-to-speech"
       }
+    }
+  },
+  "issues": {
+    "quota_exhausted": {
+      "title": "Soniox quota exhausted",
+      "description": "Soniox rejected the request because the project balance or monthly budget is exhausted (error_type: {error_type}, request_id: {request_id}). Add credit or raise the budget in the Soniox console, then reload the integration."
+    },
+    "permission_denied": {
+      "title": "Soniox API key is missing a permission",
+      "description": "The Soniox API key is valid but is not allowed to use this endpoint (error_type: {error_type}, request_id: {request_id}). Grant the key the required permission in the Soniox console, then reload the integration."
+    },
+    "python_realtime_regression": {
+      "title": "Python {python_version} breaks Soniox realtime streams",
+      "description": "An ssl regression in this Python version (CPython/gh-137583) makes the Soniox realtime speech-to-text and text-to-speech WebSocket connections hang without an error. Update Home Assistant Core to a version that does not ship Python {python_version}."
     }
   }
 }

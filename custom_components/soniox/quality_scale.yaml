@@ -49,11 +49,17 @@ rules:
     comment: Cloud STT/TTS entities stay available; request errors are returned per call.
   integration-owner: done
   log-when-unavailable:
-    status: todo
+    status: exempt
+    comment: >-
+      Cloud STT/TTS entities stay available; a failed request is logged with
+      its Soniox error_type and request_id and reported to the caller.
   parallel-updates: done
   reauthentication-flow: done
   test-coverage:
-    status: todo
+    status: done
+    comment: >-
+      pytest runs in CI with coverage. The suite imports the real soniox SDK
+      rather than stubs, so pydantic validation is genuinely exercised.
 
   # Gold
   devices: done
@@ -70,14 +76,16 @@ rules:
   docs-examples:
     status: todo
   docs-known-limitations:
-    status: todo
+    status: done
+    comment: README documents endpoint detection vs diarization and Python 3.13.6.
   docs-supported-devices:
     status: exempt
     comment: This integration does not support physical devices.
   docs-supported-functions:
     status: todo
   docs-troubleshooting:
-    status: todo
+    status: done
+    comment: README explains permission, quota and region problems.
   docs-use-cases:
     status: todo
   dynamic-devices:
@@ -91,12 +99,10 @@ rules:
   entity-disabled-by-default:
     status: todo
   entity-translations: done
-  exception-translations:
-    status: todo
+  exception-translations: done
   icon-translations: done
   reconfiguration-flow: done
-  repair-issues:
-    status: todo
+  repair-issues: done
   stale-devices:
     status: exempt
     comment: Cloud API service; there are no physical devices to expire.
@@ -108,5 +114,4 @@ rules:
     comment: >
       The official soniox SDK constructs its own httpx.AsyncClient and does
       not accept an injected Home Assistant websession.
-  strict-typing:
-    status: todo
+  strict-typing: done

@@ -2,28 +2,42 @@
 
 from __future__ import annotations
 
-import hashlib
+from typing import Any
+from uuid import uuid4
 
 from soniox import AsyncSonioxClient
 
-from .const import DEFAULT_REGION, REGION_ENDPOINTS
+from .const import (
+    DEFAULT_REGION,
+    REGION_ENDPOINTS,
+    REQUEST_TIMEOUT_SEC,
+    VALIDATION_TIMEOUT_SEC,
+)
 
 
-def unique_id_from_api_key(api_key: str) -> str:
-    """Return a stable unique id that does not contain the raw API key."""
-    return hashlib.sha256(api_key.encode()).hexdigest()
+def new_unique_id() -> str:
+    """Return a random unique id for a config entry.
+
+    The unique id must not be derived from the API key: users rotate keys in
+    the Soniox console, and a key-derived id would make reauthentication and
+    reconfiguration abort with ``wrong_account`` for a legitimate new key.
+    """
+    return uuid4().hex
 
 
 def create_soniox_client(
-    api_key: str, region: str = DEFAULT_REGION
+    api_key: str, region: str = DEFAULT_REGION, **client_kwargs: Any
 ) -> AsyncSonioxClient:
     """Create an AsyncSonioxClient for the given region.
 
     The official SDK builds its own httpx.AsyncClient and does not accept
-    Home Assistant's shared websession.
+    Home Assistant's shared websession. Extra keyword arguments are forwarded
+    to the SDK so callers can inject proxy and TLS settings.
     """
-    endpoints = REGION_ENDPOINTS[region]
-    return AsyncSonioxClient(api_key=api_key, **endpoints)
+    endpoints = REGION_ENDPOINTS.get(region, REGION_ENDPOINTS[DEFAULT_REGION])
+    return AsyncSonioxClient(
+        api_key=api_key, timeout_sec=REQUEST_TIMEOUT_SEC, **endpoints, **client_kwargs
+    )
 
 
 async def async_check_client(client: AsyncSonioxClient) -> None:
@@ -33,7 +47,9 @@ async def async_check_client(client: AsyncSonioxClient) -> None:
 
 async def async_validate_api_credentials(api_key: str, region: str) -> None:
     """Validate an API key, then close the temporary client."""
-    client = create_soniox_client(api_key, region)
+    client = create_soniox_client(
+        api_key, region, timeout_sec=VALIDATION_TIMEOUT_SEC
+    )
     try:
         await async_check_client(client)
     finally:

@@ -3,13 +3,13 @@
     "abort": {
       "already_configured": "Soniox zaten yapılandırılmış.",
       "reauth_successful": "Yeniden kimlik doğrulama başarılı",
-      "reconfigure_successful": "Yeniden yapılandırma başarılı",
-      "wrong_account": "API anahtarı mevcut Soniox hesabıyla eşleşmiyor."
+      "reconfigure_successful": "Yeniden yapılandırma başarılı"
     },
     "error": {
       "cannot_connect": "Bağlantı kurulamadı",
       "invalid_auth": "Kimlik doğrulama geçersiz",
-      "unknown": "Beklenmeyen hata"
+      "unknown": "Beklenmeyen hata",
+      "quota_exhausted": "Soniox proje bakiyesi veya bütçesi tükendi. Soniox konsolundan kredi ekleyin veya bütçeyi yükseltin, ardından tekrar deneyin."
     },
     "step": {
       "user": {
@@ -103,6 +103,20 @@
       "soniox_tts": {
         "name": "Metinden konuşmaya"
       }
+    }
+  },
+  "issues": {
+    "quota_exhausted": {
+      "title": "Soniox kotası tükendi",
+      "description": "Soniox isteği, proje bakiyesi veya aylık bütçe tükendiği için reddetti (error_type: {error_type}, request_id: {request_id}). Soniox konsolundan kredi ekleyin veya bütçeyi yükseltin, ardından entegrasyonu yeniden yükleyin."
+    },
+    "permission_denied": {
+      "title": "Soniox API anahtarında eksik izin var",
+      "description": "Soniox API anahtarı geçerli ancak bu uç noktayı kullanma izni yok (error_type: {error_type}, request_id: {request_id}). Soniox konsolundan anahtara gereken izni verin, ardından entegrasyonu yeniden yükleyin."
+    },
+    "python_realtime_regression": {
+      "title": "Python {python_version} Soniox gerçek zamanlı akışlarını engelliyor",
+      "description": "Bu Python sürümündeki bir ssl regresyonu (CPython/gh-137583), Soniox gerçek zamanlı konuşmadan metne ve metinden konuşma WebSocket bağlantılarının hata vermeden asılı kalmasına neden oluyor. Home Assistant Core'u Python {python_version} içermeyen bir sürüme güncelleyin."
     }
   }
 }

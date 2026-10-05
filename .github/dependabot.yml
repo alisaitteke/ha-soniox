@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # The soniox SDK is pinned in manifest.json, so Home Assistant installs the
+  # exact version listed there. Bumping it is a deliberate, reviewable change.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    open-pull-requests-limit: 3
+    ignore:
+      # Keep in lockstep with pyproject.toml and bump both together.
+      - dependency-name: "homeassistant"
+
+  - package-ecosystem: pip
+    directory: "/custom_components/soniox"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+    groups:
+      github-actions:
+        patterns:
+          - "*"

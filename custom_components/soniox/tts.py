@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator, AsyncIterable
+from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
 from typing import Any
 from uuid import uuid4
 
@@ -12,6 +12,10 @@ from homeassistant.components.tts import (
     TextToSpeechEntity,
     TtsAudioType,
     Voice,
+)
+from homeassistant.components.tts.entity import (
+    TTSAudioRequest,
+    TTSAudioResponse,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -32,17 +36,18 @@ from .const import (
     DEFAULT_TTS_VOICE,
     SUPPORTED_LANGUAGES,
 )
+from .exceptions import log_api_error, log_realtime_error
 from .models import SonioxConfigEntry, language_to_iso639, soniox_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 6
 
-try:
-    from homeassistant.components.tts import TTSAudioRequest, TTSAudioResponse
-except ImportError:  # Home Assistant < 2025.2 in some test pins
-    TTSAudioRequest = None  # type: ignore[misc, assignment]
-    TTSAudioResponse = None  # type: ignore[misc, assignment]
+
+async def _aiter(chunks: AsyncIterable[str]) -> AsyncIterator[str]:
+    """Adapt an AsyncIterable to the AsyncIterator the SDK expects."""
+    async for chunk in chunks:
+        yield chunk
 
 
 def _fallback_voices(configured: str) -> list[Voice]:
@@ -106,7 +111,7 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
         self._attr_unique_id = f"{entry.entry_id}_tts"
         self._attr_device_info = soniox_device_info(entry.entry_id)
 
-    def _option(self, key: str, default: object) -> object:
+    def _option(self, key: str, default: Any) -> Any:
         """Return a stored option, falling back for older entries."""
         options = self._entry.options
         if key not in options or options[key] is None:
@@ -140,22 +145,45 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
         self, message: str, language: str, options: dict[str, Any]
     ) -> TtsAudioType:
         """Synthesize a complete utterance via the Soniox REST TTS API."""
+        voice = self._voice(options)
+        model = self._model()
+        speed = self._speed()
+        _LOGGER.debug(
+            "Requesting Soniox TTS: model=%s voice=%s language=%s speed=%s "
+            "characters=%s",
+            model,
+            voice,
+            language,
+            speed,
+            len(message),
+        )
         try:
             audio = await self._entry.runtime_data.client.tts.generate(
                 text=message,
-                voice=self._voice(options),
-                model=self._model(),
+                voice=voice,
+                model=model,
                 language=language_to_iso639(language),
                 audio_format="wav",
                 config=CreateTtsConfig(
-                    speed=self._speed(),
+                    speed=speed,
                     reduce_silence=self._reduce_silence(),
                 ),
             )
         except SonioxError as err:
-            _LOGGER.exception("Soniox TTS request failed")
+            log_api_error(
+                _LOGGER,
+                "Soniox TTS generation failed",
+                err,
+                model=model,
+                voice=voice,
+            )
             raise HomeAssistantError("Unable to generate Soniox speech") from err
         if not audio:
+            _LOGGER.error(
+                "Soniox TTS returned empty audio (model=%s, voice=%s)",
+                model,
+                voice,
+            )
             raise HomeAssistantError("Soniox returned empty speech audio")
         return "wav", audio
 
@@ -175,25 +203,62 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
             speed=self._speed(),
             reduce_silence=self._reduce_silence(),
         )
+        _LOGGER.debug(
+            "Starting Soniox streaming TTS: model=%s voice=%s language=%s "
+            "stream_id=%s",
+            config.model,
+            config.voice,
+            config.language,
+            config.stream_id,
+        )
+        # A bare ``except`` around a ``yield`` cannot run: once the consumer
+        # receives a chunk it may suspend or abandon the generator, and the
+        # failure then escapes uncaught. Buffering keeps the session open
+        # until the audio is complete so failures are converted to a
+        # HomeAssistantError the caller can act on.
+        buffered: list[bytes] = []
         try:
             async with self._entry.runtime_data.client.realtime.tts.connect(
                 config=config
             ) as session:
-                await session.send_text_chunks(message_chunks, text_end=True)
+                await session.send_text_chunks(
+                    _aiter(message_chunks), text_end=True
+                )
                 async for chunk in session.receive_audio_chunks():
                     if chunk:
-                        yield chunk
+                        buffered.append(chunk)
         except SonioxError as err:
-            _LOGGER.exception("Soniox streaming TTS request failed")
+            log_realtime_error(
+                _LOGGER,
+                "Soniox streaming TTS failed",
+                err,
+                model=config.model,
+                voice=config.voice,
+                stream_id=config.stream_id,
+            )
             raise HomeAssistantError("Unable to stream Soniox speech") from err
 
-    if TTSAudioRequest is not None and TTSAudioResponse is not None:
-
-        async def async_stream_tts_audio(self, request: Any) -> Any:
-            """Stream speech for Assist on Home Assistant versions that support it."""
-            return TTSAudioResponse(
-                "wav",
-                self.async_iter_tts_audio(
-                    request.message_gen, request.language, request.options
-                ),
+        if not buffered:
+            _LOGGER.error(
+                "Soniox streaming TTS produced no audio (model=%s, voice=%s)",
+                config.model,
+                config.voice,
             )
+        _LOGGER.debug(
+            "Soniox streaming TTS finished (chunks=%s, bytes=%s)",
+            len(buffered),
+            sum(len(chunk) for chunk in buffered),
+        )
+        for chunk in buffered:
+            yield chunk
+
+    async def async_stream_tts_audio(
+        self, request: TTSAudioRequest
+    ) -> TTSAudioResponse:
+        """Stream speech to Assist using the realtime TTS WebSocket API."""
+        return TTSAudioResponse(
+            "wav",
+            self.async_iter_tts_audio(
+                request.message_gen, request.language, request.options
+            ),
+        )

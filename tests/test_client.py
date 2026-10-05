@@ -1,22 +1,16 @@
 """Unit tests for the Soniox client helper."""
 
-from custom_components.soniox.client import unique_id_from_api_key
+from custom_components.soniox.client import new_unique_id
 from custom_components.soniox.const import REGION_ENDPOINTS, REGIONS
 
 
-def test_unique_id_is_stable_and_not_the_raw_key() -> None:
-    """The unique id must be deterministic and must not leak the API key."""
-    first = unique_id_from_api_key("secret-key")
-    second = unique_id_from_api_key("secret-key")
-    assert first == second
-    assert first != "secret-key"
+def test_unique_id_is_random_and_not_derived_from_the_key() -> None:
+    """The unique id must not depend on, or reveal, the API key."""
+    first = new_unique_id()
+    second = new_unique_id()
+    assert first != second, "a key-derived id would be stable across calls"
     assert "secret-key" not in first
-    assert len(first) == 64
-
-
-def test_unique_id_differs_per_key() -> None:
-    """Different API keys produce different unique ids."""
-    assert unique_id_from_api_key("key-a") != unique_id_from_api_key("key-b")
+    assert len(first) == 32
 
 
 def test_region_endpoints_cover_all_regions() -> None:
