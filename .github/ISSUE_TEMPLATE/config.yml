@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/alisaitteke/ha-soniox/security/advisories/new
+    about: Report security problems privately. Do not open a public issue.
+  - name: Soniox account, billing or API keys
+    url: https://console.soniox.com
+    about: This is a community integration. Account, quota and billing questions belong with Soniox.
+  - name: Home Assistant voice / Assist questions
+    url: https://community.home-assistant.io/
+    about: General Assist pipeline questions not specific to this integration.
