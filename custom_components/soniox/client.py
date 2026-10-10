@@ -35,9 +35,10 @@ def create_soniox_client(
     to the SDK so callers can inject proxy and TLS settings.
     """
     endpoints = REGION_ENDPOINTS.get(region, REGION_ENDPOINTS[DEFAULT_REGION])
-    return AsyncSonioxClient(
-        api_key=api_key, timeout_sec=REQUEST_TIMEOUT_SEC, **endpoints, **client_kwargs
-    )
+    # Callers may pass timeout_sec (validation uses a shorter one); only fill
+    # in the default when they did not, otherwise the SDK receives it twice.
+    client_kwargs.setdefault("timeout_sec", REQUEST_TIMEOUT_SEC)
+    return AsyncSonioxClient(api_key=api_key, **endpoints, **client_kwargs)
 
 
 async def async_check_client(client: AsyncSonioxClient) -> None:
