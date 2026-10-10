@@ -1,6 +1,8 @@
 """Unit tests for the Soniox client helper."""
 
-from custom_components.soniox.client import new_unique_id
+from soniox import AsyncSonioxClient
+
+from custom_components.soniox.client import create_soniox_client, new_unique_id
 from custom_components.soniox.const import REGION_ENDPOINTS, REGIONS
 
 
@@ -30,3 +32,20 @@ def test_region_endpoints_cover_all_regions() -> None:
             assert "api.soniox.com" in endpoints["api_base_url"]
         else:
             assert f"api.{region}.soniox.com" in endpoints["api_base_url"]
+
+
+def test_create_client_accepts_explicit_timeout() -> None:
+    """An explicit timeout must not reach the SDK twice.
+
+    Regression test: the credential check passes a shorter validation
+    timeout, and a duplicate keyword used to make every first-time setup
+    fail with TypeError before any network call.
+    """
+    client = create_soniox_client("sk_test_soniox_key", "us", timeout_sec=10)
+    assert isinstance(client, AsyncSonioxClient)
+
+
+def test_create_client_default_timeout() -> None:
+    """Constructing without an explicit timeout still works."""
+    client = create_soniox_client("sk_test_soniox_key", "us")
+    assert isinstance(client, AsyncSonioxClient)
