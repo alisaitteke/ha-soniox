@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from collections.abc import AsyncGenerator, AsyncIterable, AsyncIterator
+from contextlib import suppress
 from typing import Any
 from uuid import uuid4
 
@@ -193,7 +196,7 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
         language: str,
         options: dict[str, Any],
     ) -> AsyncGenerator[bytes]:
-        """Yield WAV audio chunks from a realtime TTS session."""
+        """Yield WAV audio chunks as the realtime session produces them."""
         config = RealtimeTTSConfig(
             stream_id=f"ha-{uuid4()}",
             model=self._model(),
@@ -211,22 +214,42 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
             config.language,
             config.stream_id,
         )
-        # A bare ``except`` around a ``yield`` cannot run: once the consumer
-        # receives a chunk it may suspend or abandon the generator, and the
-        # failure then escapes uncaught. Buffering keeps the session open
-        # until the audio is complete so failures are converted to a
-        # HomeAssistantError the caller can act on.
-        buffered: list[bytes] = []
+        started_at = time.monotonic()
+        chunk_count = 0
+        byte_count = 0
         try:
             async with self._entry.runtime_data.client.realtime.tts.connect(
                 config=config
             ) as session:
-                await session.send_text_chunks(
-                    _aiter(message_chunks), text_end=True
+                # Send text in a task so audio can stream while the caller is
+                # still producing text, such as LLM deltas from the pipeline.
+                send_task = asyncio.create_task(
+                    session.send_text_chunks(_aiter(message_chunks), text_end=True)
                 )
-                async for chunk in session.receive_audio_chunks():
-                    if chunk:
-                        buffered.append(chunk)
+                try:
+                    async for chunk in session.receive_audio_chunks():
+                        if chunk:
+                            if chunk_count == 0:
+                                _LOGGER.debug(
+                                    "Soniox streaming TTS first audio chunk "
+                                    "after %.2f s",
+                                    time.monotonic() - started_at,
+                                )
+                            chunk_count += 1
+                            byte_count += len(chunk)
+                            yield chunk
+                except BaseException:
+                    # The consumer stopped early (interruption) or the stream
+                    # failed: never leave the sender running.
+                    if not send_task.done():
+                        send_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await send_task
+                    raise
+                # The receive loop only ends after the sender signalled
+                # text_end, so the send task settles immediately.
+                with suppress(asyncio.CancelledError):
+                    await send_task
         except SonioxError as err:
             log_realtime_error(
                 _LOGGER,
@@ -238,7 +261,7 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
             )
             raise HomeAssistantError("Unable to stream Soniox speech") from err
 
-        if not buffered:
+        if not chunk_count:
             _LOGGER.error(
                 "Soniox streaming TTS produced no audio (model=%s, voice=%s)",
                 config.model,
@@ -246,11 +269,9 @@ class SonioxTextToSpeechEntity(TextToSpeechEntity):
             )
         _LOGGER.debug(
             "Soniox streaming TTS finished (chunks=%s, bytes=%s)",
-            len(buffered),
-            sum(len(chunk) for chunk in buffered),
+            chunk_count,
+            byte_count,
         )
-        for chunk in buffered:
-            yield chunk
 
     async def async_stream_tts_audio(
         self, request: TTSAudioRequest

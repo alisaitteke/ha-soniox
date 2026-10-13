@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -119,6 +120,41 @@ async def test_tts_stream_yields_chunks() -> None:
     assert config.voice == DEFAULT_TTS_VOICE
     assert config.speed == 1.0
     assert config.reduce_silence is False
+
+
+async def test_tts_stream_yields_first_chunk_before_stream_ends() -> None:
+    """Audio must reach the caller while the session is still open.
+
+    Regression test: every chunk used to be buffered and yielded only after
+    the session closed, so Assist could not start playing until the whole
+    utterance had been generated.
+    """
+    opened = asyncio.Event()
+
+    class _OpenEndedSession(_FakeTTSSession):
+        async def send_text_chunks(
+            self, chunks: object, *, text_end: bool = True
+        ) -> None:
+            self.sent.append(chunks)
+            await opened.wait()
+
+        async def receive_audio_chunks(self):
+            yield b"early-chunk"
+            await opened.wait()
+
+    session = _OpenEndedSession([])
+    entity = SonioxTextToSpeechEntity(_entry(session=session))
+
+    async def messages():
+        yield "Hello"
+        await opened.wait()
+
+    generator = entity.async_iter_tts_audio(messages(), "en", {})
+    try:
+        first = await asyncio.wait_for(generator.__anext__(), timeout=1)
+        assert first == b"early-chunk"
+    finally:
+        await generator.aclose()
 
 
 async def test_tts_generate_uses_speed_and_voice() -> None:
